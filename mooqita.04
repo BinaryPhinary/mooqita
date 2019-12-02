@@ -1,0 +1,151 @@
+#
+# * Whenever there is room for interpretation, make a decision and write a comment about what you think can be interpreted in more than one way and how you decide to interpret the question. *
+#
+# *In every step let your reviewer know what your thought process is and why you did something this way. 
+#
+# * You can directly upload your solution here or upload it to github and post the link to github as your solution. 
+#
+# * Each step described below is meant to separate the thought process, you don't need to have a single solution file for each step. You can comment inside the code file(s), use a separate text file, or explain everything in the solution here.
+#
+# * The following challenge can be done with one script only. If you want to use multiple scripts explain why.
+#
+# * Counting lines in a file refers to the output of "wc -l"
+#
+# Write a script using /bin/bash that does the following: 
+#	1. Create a series of random numbers and strings of characters and write them to a file, no more than 15 characters for each line. As characters assume the 
+#		Latin Alphabet, [A-Za-z], without special characters and the numbers 0,1,2,3,4,5,6,7,8,9. 
+#		Example of a line with 15 characters: 123456789aBcDeF Explain the process how you create the lines in your file.
+#	2. Control the size of the file. If the file reaches the size of 1 MiB interrupt the creation of more random lines. 
+#		What is a good way to control the size of a file? Discuss what options you know and why you picked one of them. 
+#		Come up with two ways in Linux to find the size of a file. This step is there to protect you from filling up your disk. 
+#		You should write your script in a way that it terminates when reaching a certain size.
+#	3. Now sort the file. Select a sorting style. Which one did you use? Why? What is the most common command in Linux to sort a file and what happens when you use 
+#		the default option, i.e. using no specific sorting option? 
+#	4. Remove all lines that start with an “a”, no matter if it is in uppercase or lowercase. Save the result into a new file. Use regular expressions to do this. 
+#	5. How many lines were removed? 
+#
+# This command willd determine the size of the file - and is one option.
+# stat --printf="%s" file.any
+# %s is the total size of the file.  echo may also be suitable here who knows - may have to test it
+#
+# Initial thought to complete this assignment is a while loop - while file size is less than or equal to 1 MiB then continue to add random numbers and characters
+# I have broken this problem down into 3-4 steps.
+# Step 1 - deteremine how to figure out the size of the file
+# Step 2 - determine how to create a file with a randomized, or ascending file name
+# Step 3 - determine if the command to query the size of the file can be used to break a while loop.  I suspect it can, but I do not know
+# Step 4 - determine how to insert both random numbers and letters. I assume there is some derivation of $RANDOM that can be used here.  Needs research
+# Step 5 - determine how to keep the number of characters to 15 per line - this part could be tricky
+# Step 6 - determine how to export the file with a appended ascending name of some sort.  Random file name appending to a root.
+# Step 7 - determine how to sort after ending the while loop.  I have some theories on this one, but nothing solid yet.  Re-save and re-name the file with the now 
+#		sorted data.
+# Step 8 - determine how to search through the file and remove all of the lines that start with an "a" - fairly confident that there are ways to do this without too
+#	 much bother
+# Step 9 - Count the lines - in the end this turned out to be more challenging than I had anticipated as I needed to parse out the file name from the wc -l command.  
+#	Unbeknownst to me wc -l also includes the file name in the output.  I tried various methods to parse using sed - however in the end a read statement relying
+#	on the IFS space was the easiest and cleanest    
+#
+
+#!/bin/bash
+
+# 1048576 is apparently the number of bytes in a MiB - who knew - but there it is.
+
+MAXSIZE=1048576
+
+#MAXSIZE=1048
+
+# I decided it would be better to generate randomized file names for faster testing purposes, and ease of use. I anticipated that I would need to run this script
+# many times before completing, and I preferred not to have to delete exisiting files first, or wondering if the output overwrote the previous version etc.
+# This simply made it cleaner and easier to test with and use.  I could have done a query for the file in the directory, and deleting it before proceeding, but I
+# opted for this approach instead in the event that I wanted to go back to previous versions of the generated files.  The below variables are the 'base' values from
+# which I would build the two output files I would need in the end, and I simply appended a current time to them.
+
+file_name=mooqita1
+
+file_name2=mooqita_Sort
+
+current_time=$(date "+%d-%H.%M.%S")
+
+new_filename=$file_name.$current_time
+
+touch $new_filename
+
+# This commented echo was a testing step to ensure that the files were being generated properly.  Once I determined that they were, I commented it out
+# in the event that I need to return to this test
+#echo "You should find your new filename generated with a timestamp"
+
+
+# As I researched Filesize it became clear that it was a bit of a 'problem' - with respect to the methods used to determine file size - as bash does not come with a 
+# native command to determine the size of a file - therefore the options are - stat, ls or possibly wc.  ls is problematic because its too hard to control the output
+# sufficiently to parse the result reliably if its ported.  I ran into another possibility with du - which is used to report the disk usage, which leads to debates
+# about what the true size of the file is, and whether meta data is included or not.  The issue with du seems to be that while its portable - it makes many system calls
+# in order to achieve its job - and therefore is likely not a good choice.  Stat seemed to be the fastest and simplest, and most reliable method to achieve the goal of
+# determining file size. Since portability is not a requirement of the excercise - either stat or ls could have been used as they are the easiest with which to generate
+# the needed data, however ls requires the further step of parsing the data, and therefore Stat seemed to be best
+
+FILESIZE=$(stat -c%s "$new_filename")
+#echo "Your Filesize is $FILESIZE"
+
+
+# The if statement up to the echo "Your Filesize is $FILESIZE is a test to validate the filesize test was working.  Once I determined it was working
+# I commended it out as it isnt needed.
+#if [[ $FILESIZE -le 0 ]] ; then
+#	echo "some junk for the file $new_filename" >> $new_filename
+#fi
+
+#FILESIZE=$(stat -c%s "$new_filename")
+#echo "Your Filesize is $FILESIZE"
+
+echo "Please wait a moment while we generate your file for you"
+
+# Below is the main portion of the script.  I chose a while statement while initially reading the assignment.  When it came to implementing I still felt
+# it was the 'best choice'.  A loop is most efficient, and while makes it the easiest to implement and interpret.  Initially I had made the error of not including
+# the FILESIZE check within the loop, and could not understand why it would not exit.  Once I realized it needed to also be included in the loop, it was easy/fast 
+# to complete.  I chose urandom as I have read that there can be issues with /dev/random not being random enough, and /dev/urandom was highly reccomended by others
+# This portion of the script essentially cat's the urandom file, and removes all but the characters specified.  It then formats the output of the command such that
+# there are 15 characters per line, displays the first line of the result of the 3rd command, and outputs it to the variable $new_filename
+ 
+while [ $FILESIZE -lt $MAXSIZE ]
+do
+
+FILESIZE=$(stat -c%s "$new_filename")
+
+cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 15 | head -n 1 >> $new_filename
+
+done
+
+# Capturing the number of lines and storing it in a variable in anticipation of comparing it vs the file with the deleted lines to determine the total number deleted
+mooqita1_linesize=$( wc -l "$new_filename" )
+
+# wc also includes the file name in the output and therefore the number of lines needs to be parsed and stored
+
+read -r mooqita1_line_num stuff <<< $mooqita1_linesize
+
+# Making a new unique file name to store the sorted data in
+current_time2=$( date "+%d-%H.%M.%S")
+
+new_filename2=$file_name2.$current_time2
+
+# The sort and putting it into the new unique file name.  Sort seemed like the natural fit, as I wanted to sort it.  Interestingly enough when no real parameters
+# are entered into sort, it automatically sorts it by starting character per line - with 0 first, 1 second etc to 9, and then from a through to z.  Sort appears to be
+# the most common command used in Linux to sort a file.  I have assumed that there does not need to be a file out after sort, and then another file output
+# after delete.  I have created two files in the end instead of 3.  Specifically instruction step 4 requests a file output, however step 3 - which defines the requirement
+# to sort does not request a file output - and thus I have not provided one.   
+echo "$(sort $new_filename)" >  $new_filename2
+
+# Next step will be delete all of the rows that start with aA
+sed -i '/^a/d ; /^A/d' $new_filename2
+
+# Next step will be to then count the number of lines in this file and then do some simple math to determine how many were deleted
+mooqita2_del_count=$( wc -l "$new_filename2" )
+
+# Again - parse out the remainder of the file name from the wc -l to get the magic number
+read -r mooqita2_line_num stuff <<< $mooqita2_del_count
+
+# echo $mooqita2_line_num
+
+mooqita_total_del=$(( $mooqita1_line_num - $mooqita2_line_num ))
+echo "The total number of lines deleted was $mooqita_total_del"
+
+echo "The file names - in case you would like to check my work are $new_filename & $new_filename2"
+
+echo "Thank you for playing generating random noise data in a file and sorting it with me!"
